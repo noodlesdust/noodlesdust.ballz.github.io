@@ -1,0 +1,877 @@
+/*
+Ballz, my sixteenth game!
+Based on the game Ballz by Ketchapp.
+
+Started: 4/16/2018
+Finished: 4/22/2018
+Released: 4/23/2018
+
+ - 4/23/2018: 134 votes, first on the hotlist!
+ - 4/24/2018: 255 votes, 202 spin-offs! Still at the top.
+ - 4/25/2018: 343 votes, 311 spin-offs! Droppped to second.
+ - 4/26/2018: 419 votes, 397 spin-offs! The program above mine got hidden, so I'm back to first. Dropped to third now.
+ - 4/27/2018: 485 votes, 457 spin-offs! Dropped to eighth.
+ - 4/28/2018: 502 votes!
+ - 4/29/2018: 518 votes, 490 spin-offs!
+ - 4/30/2018: 535 votes, 514 spin-offs!
+ - 5/3/2018: 564 votes, 554 spin-offs!
+ - 5/13/2018: 646 votes, 676 spin-offs. I took away the error I made, so you can play it again.
+ - 6/23/2018: 700 votes!
+ - 9/28/2018: 768 votes!
+ - 10/23/2018: 800 votes!
+ - 11/23/2018: 846 votes, 1004 spin-offs!
+ - 12/28/2018: 900 votes, 1075 spin-offs! Added a "game over" scene.
+ - 3/8/2019: 1002 votes, 1134 spin-offs!
+ - 4/19/2019: Did a little update, 1058 votes, 1166 spin-offs.
+ - 2/24/2020: 1275 votes, 1340 spin-offs!
+*/
+
+// Press [SPACE] for save code.
+var saveCode = [0, 0, true, false, false, false];
+
+smooth();
+size(600, 600, P2D);
+
+var x = 300;
+var y = 500;
+
+// Spin-off proof is required to get on the leader board.
+var scoresList = [
+    {name : "Bersalon", score : 619},
+    {name : "Programming King", score : 580},
+    {name : "Sharpy's Dad", score : 538},
+    {name : "beanng", score : 458},
+    {name : "Lord Alexander", score : 1688}
+];
+
+var curScore = 0;
+
+scoresList = scoresList.sort(function(a, b) {
+    return b.score - a.score;
+});
+
+var scene = "menu";
+
+var blockSize = 50;
+var widthInBlocks = (width - 200) / blockSize;
+var blocks = [], plus = [], plus2 = [];
+var Max = 4;
+
+var speed = 6;
+
+var click = false;
+
+var choice;
+
+// These two functions load google fonts and put them in a list.
+var fonts = [
+    createFont("FreeSans"),
+    createFont("monospace")
+];
+
+// Currenct ballz amount
+var amount = 1;
+
+// Moved the blocks
+var moved = false;
+
+// Moved the position
+var movedX = false;
+
+// Green ring
+var other = saveCode[0];
+
+// Effect stuff
+var slideY = 0;
+var sliding = false;
+var fade = 0;
+
+var score = 0;
+
+var record = saveCode[1];
+
+// Next x position
+var nextX = x;
+
+// Angle to the mouse
+var angleAt = 0;
+
+// Current ballz collected/shot
+var curNum = 0;
+
+// Ballz
+var ballz = [];
+
+// Ballz shooting
+var go = false;
+
+// Show instructions
+var instruct = true;
+var instructFade = 255;
+
+noStroke();
+
+// Pause
+var paused = false;
+var pauseY = -500;
+var pausePoints = [
+    {x : 115, y : 10},
+    {x : 135, y : 10},
+    {x : 135, y : 40},
+    {x : 115, y : 40},
+];
+
+// Explosions array
+var explosions = [];
+
+// Die
+var die = false;
+
+// Colors
+var ballColor = color(255, 255, 255);
+var ballColors = [
+    color(255, 255, 255),
+    color(255, 255, 0),
+    color(250, 0, 100),
+    color(50, 150, 255)
+];
+var prices = [50, 100, 200];
+
+// Smooth motion
+var Smooth = function(pos1, pos2, div) {
+    return (pos2 - pos1) / div;
+};
+
+var flash = {
+    opac : 25,
+    display : function() {
+        noStroke();
+        fill(255, 255, 255, map(this.opac, 0, 25, 0, 255));
+        rect(0, 0, width, height);
+        this.opac --;
+    },
+    reset : function(sceneTo) {
+        scene = sceneTo;
+        this.opac = 25;
+    }
+};
+
+/** Ball constructor **/
+// {
+    var Ball = function(x, y, angle) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+    };
+    
+    Ball.prototype.display = function() {
+        ellipse(this.x, this.y, 10, 10);
+    };
+    
+    Ball.prototype.move = function() {
+        if (!paused) {
+            this.x += sin(this.angle) * speed;
+            this.y -= cos(this.angle) * speed;
+        }
+    };
+// }
+
+/** Block constructor **/
+// {
+    var Block = function(x, y, num) {
+        this.x = x;
+        this.y = y;
+        this.num = num;
+        this.color = 0;
+    };
+    
+    Block.prototype.display = function() {
+        this.color = this.num + 40;
+        if (this.color > 255) {
+            this.color -= 255;
+        }
+        textAlign(CENTER, CENTER);
+        textSize(30);
+        fill(this.color, 255, 255);
+        rect(this.x + 2, this.y + 2, blockSize - 4, blockSize - 4);
+        fill(0, 0, 0);
+        text(this.num, this.x + blockSize / 2, this.y + blockSize / 2);
+    };
+    
+    Block.prototype.move = function() {
+        this.y += blockSize;
+    };
+// }
+    
+/** Button constructor **/
+// {
+    var Button = function(x, y, t, color, func) {
+        this.x = x;
+        this.y = y;
+        this.t = t;
+        this.color = color;
+        this.func = func;
+        this.w = 200;
+        this.h = 50;
+        this.plus = 0;
+    };
+    
+    Button.prototype.display = function() {
+        this.plus = 0;
+        if (this.check()) {
+            cursor("pointer");
+            this.plus = 30;
+        }
+        fill(red(this.color) + this.plus, green(this.color) + this.plus, blue(this.color) + this.plus);
+        rect(this.x - this.w / 2, this.y - this.h / 2, this.w, this.h);
+        ellipse(this.x - this.w / 2, this.y, this.h, this.h);
+        ellipse(this.x + this.w / 2, this.y, this.h, this.h);
+        fill(255, 255, 255);
+        textAlign(CENTER, CENTER);
+        textFont(fonts[0], 35);
+        text(this.t, this.x, this.y);
+    };
+    
+    Button.prototype.check = function() {
+        return mouseX > this.x - this.w / 2 && mouseX < this.x + this.w / 2 && mouseY > this.y - this.h / 2 && mouseY < this.y + this.h / 2 || dist(mouseX, mouseY, this.x - this.w / 2, this.y) < this.h / 2 || dist(mouseX, mouseY, this.x + this.w / 2, this.y) < this.h / 2;
+    };
+    
+    Button.prototype.pack = function() {
+        this.display();
+        if (this.check() && click) {
+            this.func();
+        }
+    };
+// }
+
+/** Buttons **/
+// {
+    var play = new Button(300, 300, "Play", color(250, 0, 100), function() {
+        die = false;
+        moved = false;
+        sliding = false;
+        slideY = 0;
+        fade = 0;
+        
+        movedX = false;
+        
+        Max = 4;
+        
+        blocks = [];
+        plus = [];
+        plus2 = [];
+        ballz = [];
+        
+        amount = 1;
+        curNum = 0;
+        
+        x = 300;
+        
+        score = 0;
+        
+        paused = false;
+        pauseY = -500;
+        
+        for (var i = 0; i < 2; i++) {
+            for (var j = 0; j < widthInBlocks; j++) {
+                choice = Math.floor(random(10));
+                if (choice === 0 || choice === 1 || choice === 2 || choice === 3 || choice === 4) {
+                    blocks.push(new Block(j * blockSize + 100, i * blockSize + blockSize * 2, Math.floor(random(Max / 2, Max + 1))));
+                } else if (choice === 5) {
+                    plus.push({x : j * blockSize + 100, y : i * blockSize + blockSize * 2});
+                } else if (choice === 6) {
+                    plus2.push({x : j * blockSize + 100, y : i * blockSize + blockSize * 2});
+                }
+            }
+        }
+        flash.reset("game");
+    });
+    
+    var scores = new Button(300, 370, "Scores", color(50, 150, 255), function() {
+        flash.reset("scores");
+    });
+    
+    var back = new Button(300, 500, "Back", color(250, 0, 100), function() {
+        flash.reset("menu");
+    });
+    
+    var cont = new Button(300, 300, "Continue", color(250, 0, 100), function() {
+        paused = false;
+    });
+    
+    var quit = new Button(300, 370, "Main Menu", color(50, 150, 255), function() {
+        flash.reset("menu");
+    });
+    
+    var toShop = new Button(300, 440, "Shop", color(0, 200, 190), function() {
+        flash.reset("shop");
+    });
+    
+    var one, two, three, four;
+    
+    one = new Button(150, 280, "Selected", color(255, 185, 60), function() {
+        if (saveCode[2]) {
+            this.t = "Selected";
+            ballColor = ballColors[0];
+            if (saveCode[3]) {
+                two.t = "Select";
+            }
+            if (saveCode[4]) {
+                three.t = "Select";
+            }
+            if (saveCode[5]) {
+                four.t = "Select";
+            }
+        }
+    });
+    
+    two = new Button(450, 280, "Buy: 50", color(255, 185, 60), function() {
+        if (saveCode[3]) {
+            this.t = "Selected";
+            ballColor = ballColors[1];
+            one.t = "Select";
+        } else if (other > prices[0]) {
+            other -= prices[0];
+            this.t = "Selected";
+            saveCode[3] = true;
+            ballColor = ballColors[1];
+        }
+        if (saveCode[3] || other > prices[0]) {
+            one.t = "Select";
+            if (saveCode[4]) {
+                three.t = "Select";
+            }
+            if (saveCode[5]) {
+                four.t = "Select";
+            }
+        }
+    });
+    
+    three = new Button(150, 400, "Buy: 100", color(255, 185, 60), function() {
+        if (saveCode[4]) {
+            this.t = "Selected";
+            ballColor = ballColors[2];
+            one.t = "Select";
+        } else if (other > prices[1]) {
+            other -= prices[1];
+            this.t = "Selected";
+            saveCode[4] = true;
+            ballColor = ballColors[2];
+        }
+        if (saveCode[4] || other > prices[1]) {
+            one.t = "Select";
+            if (saveCode[3]) {
+                two.t = "Select";
+            }
+            if (saveCode[5]) {
+                four.t = "Select";
+            }
+        }
+    });
+    
+    four = new Button(450, 400, "Buy: 200", color(255, 185, 60), function() {
+        if (saveCode[5]) {
+            this.t = "Selected";
+            ballColor = ballColors[3];
+            one.t = "Select";
+        } else if (other > prices[2]) {
+            other -= prices[2];
+            this.t = "Selected";
+            saveCode[5] = true;
+            ballColor = ballColors[3];
+        }
+        if (saveCode[5] || other > prices[2]) {
+            one.t = "Select";
+            if (saveCode[3]) {
+                two.t = "Select";
+            }
+            if (saveCode[4]) {
+                three.t = "Select";
+            }
+        }
+    });
+// }
+
+var bg = function() {
+    background(25, 25, 25);
+    fill(50, 50, 50);
+    rect(0, 0, 100, 600);
+    rect(500, 0, 100, 600);
+    rect(0, 0, width, blockSize);
+    rect(0, y, width, height - y);
+    fill(255, 255, 255);
+};
+
+var showBlocks = function() {
+    pushMatrix();
+    translate(0, slideY);
+    for (var i = 0; i < blocks.length; i++) {
+        blocks[i].display();
+    }
+    popMatrix();
+};
+
+var showPlus = function() {
+    pushMatrix();
+    translate(0, slideY);
+    strokeWeight(3);
+    for (var i = 0; i < plus.length; i++) {
+        fill(255, 255, 255);
+        ellipse(plus[i].x + blockSize / 2, plus[i].y + blockSize / 2, 10, 10);
+        noFill();
+        stroke(255, 255, 255);
+        ellipse(plus[i].x + blockSize / 2, plus[i].y + blockSize / 2, 23 + sin(frameCount * 3 + plus[i].x + plus[i].y) * 3, 23 + sin(frameCount * 3 + plus[i].x + plus[i].y) * 3);
+        noStroke();
+    }
+    for (var i = 0; i < plus2.length; i++) {
+        stroke(150, 255, 0);
+        noFill();
+        ellipse(plus2[i].x + blockSize / 2, plus2[i].y + blockSize / 2, 20, 20);
+        noStroke();
+    }
+    popMatrix();
+};
+
+var showScore = function() {
+    record = Math.max(record, score);
+    
+    strokeWeight(3);
+    stroke(150, 255, 0);
+    noFill();
+    ellipse(475, 25, 20, 20);
+    noStroke();
+    fill(255, 255, 255);
+    textAlign(RIGHT, CENTER);
+    textSize(25);
+    text(other, 455, 25);
+    
+    textAlign(CENTER, CENTER);
+    text(record, 180, 35);
+    
+    textSize(18);
+    text("BEST", 180, 12);
+    
+    textSize(40);
+    fill(255, 255, 255);
+    text(score, 300, 25);
+};
+
+var collide = function() {
+    for (var i = 0; i < ballz.length; i++) {
+        ballz[i].move();
+        if (ballz[i].x < 100) {
+            ballz[i].x = 100;
+            ballz[i].angle = -ballz[i].angle;
+        }
+        if (ballz[i].x > width - 100) {
+            ballz[i].x = width - 100;
+            ballz[i].angle = -ballz[i].angle;
+        }
+        if (ballz[i].y < blockSize + 5) {
+            ballz[i].y = blockSize + 5;
+            ballz[i].angle = 180 - ballz[i].angle;
+        }
+        for (var j = blocks.length - 1; j > -1; j--) {
+            if (ballz[i].x + 5 >= blocks[j].x &&
+            ballz[i].x - 5 < blocks[j].x + blockSize &&
+            ballz[i].y + 5 >= blocks[j].y &&
+            ballz[i].y - 5 < blocks[j].y + blockSize) {
+                
+                if (ballz[i].y + speed / 2 < blocks[j].y + blockSize && ballz[i].y - speed / 2 > blocks[j].y) {
+                    ballz[i].angle = -ballz[i].angle;
+                    ballz[i].x = blocks[j].x + (ballz[i].x > blocks[j].x + blockSize / 2 ? blockSize + 5 : -5);
+                } else {
+                    ballz[i].y = blocks[j].y + (ballz[i].y > blocks[j].y + blockSize / 2 ? blockSize + 5 : -5);
+                    ballz[i].angle = 180 - ballz[i].angle;
+                }
+                blocks[j].num --;
+                if (blocks[j].num < 1) {
+                    explosions.push([]);
+                    for (var k = 0; k < 30; k ++) {
+                        explosions[explosions.length - 1].push({x : blocks[j].x + blockSize / 2, y : blocks[j].y + blockSize / 2, size : random(5, 10), fade : 100, angle : random(0, 360)});
+                    }
+                    blocks.splice(j, 1);
+                }
+            }
+        }
+        for (var j = plus.length - 1; j > -1; j--) {
+            if (dist(ballz[i].x, ballz[i].y, plus[j].x + 25, plus[j].y + 25) < 15) {
+                curNum ++;
+                amount ++;
+                plus.splice(j, 1);
+            }
+        }
+        for (var j = plus2.length - 1; j > -1; j--) {
+            if (dist(ballz[i].x, ballz[i].y, plus2[j].x + 25, plus2[j].y + 25) < 15) {
+                other ++;
+                plus2.splice(j, 1);
+            }
+        }
+        if (ballz[i].y > y) {
+            if (!movedX) {
+                movedX = true;
+                nextX = ballz[i].x;
+            }
+            if (!moved && ballz.length === 1) {
+                curNum = 0;
+                Max ++;
+                moved = true;
+                for (var j = 0; j < blocks.length; j++) {
+                    blocks[j].y += blockSize;
+                    if (blocks[j].y >= height - blockSize * 3) {
+                        die = true;
+                    }
+                }
+                for (var j = 0; j < plus.length; j++) {
+                    plus[j].y += blockSize;
+                    if (plus[j].y >= height - blockSize * 3) {
+                        plus.splice(j, 1);
+                    }
+                }
+                for (var j = 0; j < plus2.length; j++) {
+                    plus2[j].y += blockSize;
+                    if (plus2[j].y >= height - blockSize * 3) {
+                        plus2.splice(j, 1);
+                    }
+                }
+                sliding = true;
+                slideY = -blockSize;
+                x = nextX;
+            }
+            ballz.splice(i, 1);  
+        }
+    }
+};
+
+var pause = function() {
+    fill(100, 100, 100);
+    beginShape();
+    for (var i = 0; i < pausePoints.length; i++) {
+        vertex(pausePoints[i].x, pausePoints[i].y);
+    }
+    endShape();
+    fill(50, 50, 50);
+    rect(122, 10, 6, 30);
+    
+    if (mouseX > 100 && mouseX < 150 && mouseY < 50) {
+        cursor("pointer");
+        if (click) {
+            paused = true;
+        }
+    }
+    
+    if (paused) {
+        pauseY += Smooth(pauseY, 100, 10);
+    } else {
+        pauseY += Smooth(pauseY, -500, 10);
+    }
+    
+    fill(0, 0, 0);
+    rect(0, pauseY, 600, 400);
+    cont.y = pauseY + 165;
+    quit.y = pauseY + 235;
+    
+    cont.pack();
+    quit.pack();
+};
+
+var showExplode = function() {
+    rectMode(CENTER);
+    for (var i = 0; i < explosions.length; i++) {
+        for (var j = 0; j < explosions[i].length; j++) {
+            fill(255, 255, 0, explosions[i][j].fade);
+            rect(explosions[i][j].x, explosions[i][j].y, explosions[i][j].size, explosions[i][j].size);
+            explosions[i][j].fade -= 5;
+            explosions[i][j].x += sin(explosions[i][j].angle);
+            explosions[i][j].y -= cos(explosions[i][j].angle);
+        }
+        if (explosions[i][0].fade < 1) {
+            explosions.splice(i, 1);
+        }
+    }
+    rectMode(CORNER);
+};
+
+var game = function() {
+    bg();
+    
+    fill(ballColor);
+    if (curNum < amount) {
+        ellipse(x, y, 10, 10);
+    }
+    
+    if (movedX) {
+        ellipse(nextX, y, 10, 10);
+        textSize(15);
+        textAlign(LEFT, BOTTOM);
+        text("x" + amount, nextX + 10, y - 10);
+    }
+    
+    colorMode(HSB);
+    showBlocks();
+    colorMode(RGB);
+    showPlus();
+    
+    showScore();
+    
+    if (!go && !paused) {
+        angleAt = atan2(y - mouseY, x - mouseX) + 90;
+        angleAt = constrain(angleAt, 91, 269);
+    }
+    
+    fill(ballColor);
+    
+    if (ballz.length < 1) {
+        strokeWeight(4);
+        stroke(ballColor);
+        var lineMult = 10;
+        for (var i = 0; i < 10; i++) {
+            line(x - sin(angleAt) * (lineMult), y + cos(angleAt) * (lineMult),x - sin(angleAt) * (lineMult + dist(mouseX, mouseY, x, y) / 20), y + cos(angleAt) * (lineMult + dist(mouseX, mouseY, x, y) / 20));
+            lineMult += dist(mouseX, mouseY, x, y) / 10;
+        }
+        noStroke();
+        pushMatrix();
+        translate(x, y);
+        rotate(angleAt + 180);
+        triangle(-3, -8, 3, -8, 0, -30);
+        popMatrix();
+        textSize(15);
+        textAlign(LEFT, BOTTOM);
+        text("x" + amount, x + 10, y - 10);
+    }
+    
+    for (var i = 0; i < ballz.length; i++) {
+        ballz[i].display();
+    }
+    
+    collide();
+    
+    if (go) {
+        if (frameCount % 5 === 0) {
+            ballz.push(new Ball(x, y, angleAt + 180));
+            curNum ++;
+        }
+        if (curNum >= amount) {
+            go = false;
+        }
+    }
+    
+    if (sliding) {
+        if (!paused) {
+            slideY ++;
+        }
+        if (slideY === 0) {
+            if (die) {
+                flash.reset("over");
+            }
+            sliding = false;
+            for (var j = 0; j < widthInBlocks; j++) {
+                choice = Math.floor(random(10));
+                if (choice === 0 || choice === 1 || choice === 2 || choice === 3 || choice === 4) {
+                    blocks.push(new Block(j * blockSize + 100, i * blockSize + blockSize * 2, Math.floor(random(Max / 2, Max + 1))));
+                } else if (choice === 5) {
+                    plus.push({x : j * blockSize + 100, y : i * blockSize + blockSize * 2});
+                } else if (choice === 6) {
+                    plus2.push({x : j * blockSize + 100, y : i * blockSize + blockSize * 2});
+                }
+            }
+            if (!die) {
+                score ++;
+            }
+            fade = 255;
+        }
+    }
+    
+    showExplode();
+    
+    if (!instruct) {
+        instructFade -= 10; 
+    }
+    fill(255, 255, 255, instructFade);
+    textAlign(CENTER, CENTER);
+    textSize(40);
+    text("Click to shoot.\nKeep the blocks\nfrom reaching\nthe bottom.", 300, 300);
+    
+    if (!paused) {
+        fade -= 20;
+    }
+    
+    fill(25, 25, 25, fade);
+    rect(100, blockSize * 2, 400, blockSize);
+    
+    slideY = constrain(slideY, -blockSize, 0);
+    
+    pause();
+};
+
+var title = function() {
+    textSize(100);
+    textAlign(CENTER, CENTER);
+    pushMatrix();
+    translate(300, 150);
+    strokeCap(ROUND);
+    strokeJoin(ROUND);
+    strokeWeight(7);
+    scale(1.3, 1.3);
+    noFill();
+    stroke(250, 0, 100);
+    beginShape();
+    vertex(-111, -37);
+    vertex(-111, 34);
+    vertex(-85, 34);
+    bezierVertex(-58, 35, -58, -4, -85, -4);
+    vertex(-111, -4);
+    vertex(-85, -4);
+    bezierVertex(-63, -4, -63, -37, -85, -37);
+    vertex(-111, -37);
+    endShape();
+    stroke(255, 185, 60);
+    ellipse(-20, 10, 48, 48);
+    line(4, 10, 4, 34);
+    stroke(0, 140, 255);
+    beginShape();
+    vertex(25, -37);
+    vertex(25, 22);
+    bezierVertex(25, 29, 30, 34, 37, 34);
+    endShape();
+    stroke(0, 200, 190);
+    beginShape();
+    vertex(53, -37);
+    vertex(53, 22);
+    bezierVertex(53, 29, 58, 34, 65, 34);
+    endShape();
+    stroke(150, 230, 0);
+    beginShape();
+    vertex(80, -14);
+    vertex(115, -14);
+    vertex(80, 34);
+    vertex(115, 34);
+    endShape();
+    popMatrix();
+    noStroke();
+};
+
+var menu = function() {
+    background(25, 25, 25);
+    title();
+    play.pack();
+    scores.pack();
+    toShop.pack();
+    textSize(50);
+    text("Record: " + record, 300, 565);
+    strokeWeight(3);
+    stroke(150, 255, 0);
+    noFill();
+    ellipse(575, 25, 20, 20);
+    noStroke();
+    fill(255, 255, 255);
+    textAlign(RIGHT, CENTER);
+    textSize(25);
+    text(other, 555, 25);
+};
+
+var over = function() {
+    background(0, 0, 0);
+    textSize(70);
+    fill(255, 255, 255);
+    textAlign(CENTER, CENTER);
+    text("Game Over!", 300, 100);
+    text("Score: " + score + "\nHigh score: " + record, 300, 300);
+    back.pack();
+};
+
+var highScores = function() {
+    background(25, 25, 25);
+    fill(250, 0, 100);
+    textAlign(CENTER, CENTER);
+    textFont(fonts[0], 80);
+    text("High Scores", 300, 100);
+    fill(255, 255, 255);
+    textFont(fonts[1], 30);
+    for (var i = 0; i < scoresList.length; i++) {
+        curScore = scoresList[i].name + " ";
+        while (curScore.length + scoresList[i].score.toString().length < 30) {
+            curScore += ".";
+        }
+        curScore += " ";
+        curScore += scoresList[i].score;
+        text(curScore, 300, 250 + i * 30);
+    }
+    back.pack();
+};
+
+var shop = function() {
+    background(25, 25, 25);
+    back.pack();
+    fill(255, 185, 60);
+    textAlign(CENTER, CENTER);
+    textFont(fonts[0], 80);
+    text("Shop", 300, 100);
+    one.pack();
+    two.pack();
+    three.pack();
+    four.pack();
+    strokeWeight(3);
+    stroke(150, 255, 0);
+    noFill();
+    ellipse(575, 25, 20, 20);
+    noStroke();
+    fill(255, 255, 255);
+    textAlign(RIGHT, CENTER);
+    textSize(25);
+    text(other, 555, 25);
+    for (var i = 0; i < ballColors.length; i++) {
+        fill(ballColors[i]);
+        ellipse(150 + (i % 2) * 300, 230 + Math.floor(i / 2) * 120, 30, 30);
+    }
+};
+
+draw = function() {
+    textFont(fonts[0]);
+    cursor("default");
+    switch (scene) {
+        case "game":
+            game();
+            break;
+        case "menu":
+            menu();
+            break;
+        case "over":
+            over();
+            break;
+        case "scores":
+            highScores();
+            break;
+        case "shop":
+            shop();
+            break;
+    }
+    flash.display();
+    click = false;
+};
+
+mouseClicked = function() {
+    click = true;
+    if (scene === "game") {
+        if (ballz.length > 0 || sliding || mouseX < 100 || mouseX > 500 || mouseY < 50 || mouseY > 500 || paused) {
+            return;
+        }
+        moved = false;
+        movedX = false;
+        go = true;
+        instruct = false;
+    }
+};
+
+keyPressed = function() {
+    if (keyCode === 32) {
+        saveCode[0] = saveCode[0];
+        saveCode[1] = record;
+        println("var saveCode = [");
+        for (var i = 0; i < saveCode.length; i++) {
+            println(saveCode[i] + ((i < saveCode.length - 1) ? "," : ""));
+        }
+        println("]");
+    }
+};
+
